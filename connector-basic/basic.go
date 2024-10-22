@@ -133,6 +133,7 @@ func (g *Connector) ConnectorReceiver(ctx *plugin.GinContext, receiverURL string
 		},
 		RedirectURL: receiverURL,
 	}
+
 	token, err := oauth2Config.Exchange(context.Background(), code)
 	if err != nil {
 		return userInfo, fmt.Errorf("code exchange failed: %s", err.Error())
@@ -144,7 +145,7 @@ func (g *Connector) ConnectorReceiver(ctx *plugin.GinContext, receiverURL string
 	))
 	client.Timeout = 15 * time.Second
 
-	response, err := client.Get(g.Config.UserJsonUrl)
+	response, err := client.Get(g.Config.UserJsonUrl + "?user=" + oauth2.AuthedUserID)
 	if err != nil {
 		return userInfo, fmt.Errorf("failed getting user info: %s", err.Error())
 	}
