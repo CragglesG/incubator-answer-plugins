@@ -1,4 +1,4 @@
-module github.com/apache/incubator-answer-plugins/util
+module github.com/cragglesg/incubator-answer-plugins/util
 
 go 1.19
 
