@@ -139,13 +139,16 @@ func (g *Connector) ConnectorReceiver(ctx *plugin.GinContext, receiverURL string
 		return userInfo, fmt.Errorf("code exchange failed: %s", err.Error())
 	}
 
+	// Extract user ID from token
+	userID := gjson.Get(token.Extra("id_token").(string), g.Config.UserIDJsonPath).String()
+
 	// Exchange token for user info
 	client := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: token.AccessToken},
 	))
 	client.Timeout = 15 * time.Second
 
-	response, err := client.Get(g.Config.UserJsonUrl + "?user=" + oauth2.AuthedUserID)
+	response, err := client.Get(g.Config.UserJsonUrl + "?user=" + userID)
 	if err != nil {
 		return userInfo, fmt.Errorf("failed getting user info: %s", err.Error())
 	}
