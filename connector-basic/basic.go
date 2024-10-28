@@ -24,16 +24,17 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"github.com/cragglesg/incubator-answer-plugins/util"
 	"io"
 	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
 
-	"github.com/cragglesg/incubator-answer-plugins/connector-basic/i18n"
+	"github.com/apache/incubator-answer-plugins/util"
+
 	"github.com/apache/incubator-answer/pkg/checker"
 	"github.com/apache/incubator-answer/plugin"
+	"github.com/cragglesg/incubator-answer-plugins/connector-basic/i18n"
 	"github.com/segmentfault/pacman/log"
 	"github.com/tidwall/gjson"
 	"golang.org/x/oauth2"
@@ -121,74 +122,74 @@ func (g *Connector) ConnectorSender(ctx *plugin.GinContext, receiverURL string) 
 }
 
 func (g *Connector) ConnectorReceiver(ctx *plugin.GinContext, receiverURL string) (userInfo plugin.ExternalLoginUserInfo, err error) {
-    code := ctx.Query("code")
-    // Exchange code for token
-    oauth2Config := &oauth2.Config{
-        ClientID:     g.Config.ClientID,
-        ClientSecret: g.Config.ClientSecret,
-        Endpoint: oauth2.Endpoint{
-            AuthURL:   g.Config.AuthorizeUrl,
-            TokenURL:  g.Config.TokenUrl,
-            AuthStyle: oauth2.AuthStyleAutoDetect,
-        },
-        RedirectURL: receiverURL,
-    }
+	code := ctx.Query("code")
+	// Exchange code for token
+	oauth2Config := &oauth2.Config{
+		ClientID:     g.Config.ClientID,
+		ClientSecret: g.Config.ClientSecret,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:   g.Config.AuthorizeUrl,
+			TokenURL:  g.Config.TokenUrl,
+			AuthStyle: oauth2.AuthStyleAutoDetect,
+		},
+		RedirectURL: receiverURL,
+	}
 
-    token, err := oauth2Config.Exchange(context.Background(), code)
-    if err != nil {
-        return userInfo, fmt.Errorf("code exchange failed: %s", err.Error())
-    }
+	token, err := oauth2Config.Exchange(context.Background(), code)
+	if err != nil {
+		return userInfo, fmt.Errorf("code exchange failed: %s", err.Error())
+	}
 
-    // Check if token is nil or AccessToken is empty
-    if token == nil || token.AccessToken == "" {
-        return userInfo, fmt.Errorf("oauth2: server response missing access_token")
-    }
+	// Check if token is nil or AccessToken is empty
+	if token == nil || token.AccessToken == "" {
+		return userInfo, fmt.Errorf("oauth2: server response missing access_token")
+	}
 
-    // Exchange token for user info
-    client := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
-        &oauth2.Token{AccessToken: token.AccessToken},
-    ))
-    client.Timeout = 15 * time.Second
+	// Exchange token for user info
+	client := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: token.AccessToken},
+	))
+	client.Timeout = 15 * time.Second
 
-    response, err := client.Get(g.Config.UserJsonUrl + "?user=" + oauth2.AuthedUserID)
-    if err != nil {
-        return userInfo, fmt.Errorf("failed getting user info: %s", err.Error())
-    }
-    defer response.Body.Close()
-    data, _ := io.ReadAll(response.Body)
+	response, err := client.Get(g.Config.UserJsonUrl + "?user=" + token.Extra("authed_user.id").(string))
+	if err != nil {
+		return userInfo, fmt.Errorf("failed getting user info: %s", err.Error())
+	}
+	defer response.Body.Close()
+	data, _ := io.ReadAll(response.Body)
 
-    userInfo = plugin.ExternalLoginUserInfo{
-        MetaInfo: string(data),
-    }
+	userInfo = plugin.ExternalLoginUserInfo{
+		MetaInfo: string(data),
+	}
 
-    if len(g.Config.UserIDJsonPath) > 0 {
-        userInfo.ExternalID = gjson.GetBytes(data, g.Config.UserIDJsonPath).String()
-    }
-    if len(userInfo.ExternalID) == 0 {
-        log.Errorf("fail to get user id from json path: %s", g.Config.UserIDJsonPath)
-        return userInfo, nil
-    }
-    if len(g.Config.UserDisplayNameJsonPath) > 0 {
-        userInfo.DisplayName = gjson.GetBytes(data, g.Config.UserDisplayNameJsonPath).String()
-    }
-    if len(g.Config.UserUsernameJsonPath) > 0 {
-        userInfo.Username = gjson.GetBytes(data, g.Config.UserUsernameJsonPath).String()
-    }
-    if len(g.Config.UserEmailJsonPath) > 0 {
-        userInfo.Email = gjson.GetBytes(data, g.Config.UserEmailJsonPath).String()
-    }
-    if g.Config.CheckEmailVerified && len(g.Config.EmailVerifiedJsonPath) > 0 {
-        emailVerified := gjson.GetBytes(data, g.Config.EmailVerifiedJsonPath).Bool()
-        if !emailVerified {
-            userInfo.Email = ""
-        }
-    }
-    if len(g.Config.UserAvatarJsonPath) > 0 {
-        userInfo.Avatar = gjson.GetBytes(data, g.Config.UserAvatarJsonPath).String()
-    }
+	if len(g.Config.UserIDJsonPath) > 0 {
+		userInfo.ExternalID = gjson.GetBytes(data, g.Config.UserIDJsonPath).String()
+	}
+	if len(userInfo.ExternalID) == 0 {
+		log.Errorf("fail to get user id from json path: %s", g.Config.UserIDJsonPath)
+		return userInfo, nil
+	}
+	if len(g.Config.UserDisplayNameJsonPath) > 0 {
+		userInfo.DisplayName = gjson.GetBytes(data, g.Config.UserDisplayNameJsonPath).String()
+	}
+	if len(g.Config.UserUsernameJsonPath) > 0 {
+		userInfo.Username = gjson.GetBytes(data, g.Config.UserUsernameJsonPath).String()
+	}
+	if len(g.Config.UserEmailJsonPath) > 0 {
+		userInfo.Email = gjson.GetBytes(data, g.Config.UserEmailJsonPath).String()
+	}
+	if g.Config.CheckEmailVerified && len(g.Config.EmailVerifiedJsonPath) > 0 {
+		emailVerified := gjson.GetBytes(data, g.Config.EmailVerifiedJsonPath).Bool()
+		if !emailVerified {
+			userInfo.Email = ""
+		}
+	}
+	if len(g.Config.UserAvatarJsonPath) > 0 {
+		userInfo.Avatar = gjson.GetBytes(data, g.Config.UserAvatarJsonPath).String()
+	}
 
-    userInfo = g.formatUserInfo(userInfo)
-    return userInfo, nil
+	userInfo = g.formatUserInfo(userInfo)
+	return userInfo, nil
 }
 
 func (g *Connector) formatUserInfo(userInfo plugin.ExternalLoginUserInfo) (
