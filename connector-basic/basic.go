@@ -140,11 +140,6 @@ func (g *Connector) ConnectorReceiver(ctx *plugin.GinContext, receiverURL string
 		return userInfo, fmt.Errorf("code exchange failed: %s", err.Error())
 	}
 
-	// Check if token is nil or AccessToken is empty
-	if token == nil || token.AccessToken == "" {
-		return userInfo, fmt.Errorf("oauth2: server response missing access_token")
-	}
-
 	// Exchange token for user info
 	client := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: token.AccessToken},
