@@ -140,13 +140,29 @@ func (g *Connector) ConnectorReceiver(ctx *plugin.GinContext, receiverURL string
 		return userInfo, fmt.Errorf("code exchange failed: %s", err.Error())
 	}
 
+	// Extract user ID from token response
+	var userID string
+	if authedUser := token.Extra("authed_user"); authedUser != nil {
+		if authedUserMap, ok := authedUser.(map[string]interface{}); ok {
+			if id, ok := authedUserMap["id"].(string); ok {
+				userID = id
+			}
+		}
+	}
+	if userID == "" {
+		return userInfo, fmt.Errorf("user ID not found in token response")
+	}
+
+	// Append user ID to user info URL
+	userInfoURL := fmt.Sprintf("%s?user=%s", g.Config.UserJsonUrl, userID)
+
 	// Exchange token for user info
 	client := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: token.AccessToken},
 	))
 	client.Timeout = 15 * time.Second
 
-	response, err := client.Get(g.Config.UserJsonUrl + "?user=" + token.Extra("authed_user.id").(string))
+	response, err := client.Get(userInfoURL)
 	if err != nil {
 		return userInfo, fmt.Errorf("failed getting user info: %s", err.Error())
 	}
